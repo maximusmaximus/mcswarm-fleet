@@ -334,5 +334,11 @@ def sync_mcp():
     console.print(f"[bold green]✅ Synced {len(mcp_servers)} worker agents to coordinator {coordinator_name}.[/bold green]")
     console.print(f"Restart coordinator to apply: systemctl --user restart {coord_slug}")
 
+@app.command()
+def dashboard():
+    """Launch the interactive terminal dashboard"""
+    from dashboard import DashboardApp
+    DashboardApp().run()
+
 if __name__ == "__main__":
     app()
