@@ -183,9 +183,11 @@ class DashboardApp(App):
         if not targets:
             return
 
-        for name in targets:
-            # Jitter to prevent API rate limits
-            await asyncio.sleep(random.uniform(0.1, 0.5))
+        for i, name in enumerate(targets):
+            # Significant stagger to bypass Venice Cloudflare DDoS limits on concurrent blasts
+            if i > 0:
+                await asyncio.sleep(1.5 + random.uniform(0.1, 0.5))
+            
             self.write_log(name, "")
             self.write_log(name, f"[bold cyan]>>> [PROMPT]: {prompt_text}[/bold cyan]")
             
