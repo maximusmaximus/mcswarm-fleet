@@ -34,6 +34,7 @@ class DashboardApp(App):
         Binding("space", "toggle_select", "Select"),
         Binding("a", "select_all", "Select All"),
         Binding("p", "prompt", "Prompt"),
+        Binding("e", "export_log", "Export Log"),
         Binding("c", "cancel_prompt", "Cancel Prompt"),
         Binding("escape", "hide_prompt", "Hide Prompt", show=False),
     ]
@@ -48,7 +49,7 @@ class DashboardApp(App):
                     yield Label("Agent Details", id="details_label")
                     yield Static("", id="details_content")
                 with Vertical(id="log-pane"):
-                    yield Label("Logs")
+                    yield Label("Logs (Hold Shift to select/copy text)")
                     yield RichLog(id="logs_view", wrap=True, highlight=True, markup=True)
         yield Input(placeholder="Enter prompt to send to selected agents (Enter to submit, Esc to cancel)...", id="prompt-input")
         yield Footer()
@@ -153,6 +154,15 @@ class DashboardApp(App):
             self.write_log(self.current_name, "[bold red]--- PROMPT CANCELLED BY USER ---[/bold red]")
             del self.prompt_tasks[self.current_name]
 
+    def action_export_log(self) -> None:
+        if self.current_name and self.current_name in self.agent_buffers:
+            export_path = Path(f"/root/projects/mcswarm/workspace/{self.current_slug}_log_export.txt")
+            export_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(export_path, "w") as f:
+                for line in self.agent_buffers[self.current_name]:
+                    f.write(line + "\n")
+            self.write_log(self.current_name, f"[bold green]✅ Log exported to {export_path}[/bold green]")
+
     def action_start_agent(self) -> None:
         if self.current_slug:
             subprocess.run(["systemctl", "--user", "start", self.current_slug])
@@ -188,7 +198,7 @@ class DashboardApp(App):
     async def run_prompt(self, name: str, slug: str, prompt: str):
         try:
             proc = await asyncio.create_subprocess_exec(
-                "podman", "exec", "-i", f"systemd-{slug}", "hermes", "-z", prompt,
+                "podman", "exec", "-i", f"systemd-{slug}", "hermes", "chat", "-q", prompt,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )
