@@ -126,13 +126,13 @@ def spinup(purpose: str = typer.Argument(..., help="The purpose or specialty of 
     # Write config.yaml
     config = {
         "model": {
-            "name": model,
+            "model": model,
             "provider": "venice"
         },
         "providers": {
             "venice": {
                 "base_url": "https://api.venice.ai/v1",
-                "api_key_env": "VENICE_API_KEY",
+                "key_env": "VENICE_API_KEY",
                 "protocol": "openai"
             }
         },
