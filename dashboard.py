@@ -241,18 +241,4 @@ To chat directly with this agent:
 
 if __name__ == "__main__":
     app = DashboardApp()
-    app.run()agent_buffers[name]:
-                log_view.write(line)
-
-    def cleanup(self):
-        for task in self.journal_tasks.values():
-            task.cancel()
-        for task in self.prompt_tasks.values():
-            task.cancel()
-
-    async def on_unmount(self):
-        self.cleanup()
-
-if __name__ == "__main__":
-    app = DashboardApp()
     app.run()
