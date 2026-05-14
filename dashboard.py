@@ -188,7 +188,7 @@ class DashboardApp(App):
     async def run_prompt(self, name: str, slug: str, prompt: str):
         try:
             proc = await asyncio.create_subprocess_exec(
-                "podman", "exec", "-i", f"systemd-{slug}", "hermes", "chat", "-z", prompt,
+                "podman", "exec", "-i", f"systemd-{slug}", "hermes", "-z", prompt,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT
             )
