@@ -175,6 +175,8 @@ Report results concisely.
 """
     (profile_dir / "SOUL.md").write_text(soul_content)
     
+    exec_cmd = "hermes gateway run" if coordinator else "sleep infinity"
+    
     # Create Quadlet
     quadlet_content = f"""[Unit]
 Description=Hermes Agent {name}
@@ -182,9 +184,11 @@ Description=Hermes Agent {name}
 [Container]
 Image=localhost/hermes-agent:latest
 EnvironmentFile={profile_dir}/.env
+Environment=CONTAINER_HOST=unix:///run/podman/podman.sock
 Volume={WORKSPACE_DIR}:/workspace:rw
 Volume={profile_dir}:/root/.hermes:rw
-{"Exec=sleep infinity" if not coordinator else "Exec=hermes gateway run"}
+Volume=/run/user/%U/podman/podman.sock:/run/podman/podman.sock
+Exec={exec_cmd}
 Network=host
 
 [Install]
@@ -322,8 +326,8 @@ def sync_mcp():
             # The quadlet runs `mcp serve` as its main process. It's expecting stdio.
             # We can connect using podman exec: `podman exec -i {slug} hermes mcp serve`.
             mcp_servers[slug] = {
-                "command": "podman",
-                "args": ["exec", "-i", f"systemd-{slug}", "hermes", "mcp", "serve"]
+                "command": "/usr/bin/podman",
+                "args": ["--remote", "exec", "-i", f"systemd-{slug}", "hermes", "mcp", "serve"]
             }
             
     config["mcp_servers"] = mcp_servers

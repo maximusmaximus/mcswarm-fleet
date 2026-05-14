@@ -79,8 +79,14 @@ class DashboardApp(App):
             except Exception:
                 status = "unknown"
             
-            sel_marker = "[x]" if name in self.selected_agents else "[ ]"
-            table.add_row(sel_marker, name, role, info["purpose"], status, key=name)
+            if name in self.selected_agents:
+                sel_marker = "✅"
+                display_name = f"[bold green]{name}[/bold green]"
+            else:
+                sel_marker = "⬛"
+                display_name = name
+
+            table.add_row(sel_marker, display_name, role, info["purpose"], status, key=name)
             
             if name not in self.agent_buffers:
                 self.agent_buffers[name] = deque(maxlen=200)
@@ -222,6 +228,20 @@ To chat directly with this agent:
         log_view.clear()
         if name in self.agent_buffers:
             for line in self.agent_buffers[name]:
+                log_view.write(line)
+
+    def cleanup(self):
+        for task in self.journal_tasks.values():
+            task.cancel()
+        for task in self.prompt_tasks.values():
+            task.cancel()
+
+    async def on_unmount(self):
+        self.cleanup()
+
+if __name__ == "__main__":
+    app = DashboardApp()
+    app.run()agent_buffers[name]:
                 log_view.write(line)
 
     def cleanup(self):
