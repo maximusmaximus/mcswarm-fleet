@@ -1,5 +1,5 @@
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, RichLog, Label, Input
+from textual.widgets import Header, Footer, DataTable, Static, RichLog, Label, Input, TextArea
 from textual.containers import Horizontal, Vertical
 from textual.binding import Binding
 import json
@@ -19,11 +19,11 @@ def load_registry():
 
 class DashboardApp(App):
     CSS = """
-    #left-pane { width: 60%; height: 100%; border-right: solid green; }
-    #right-pane { width: 40%; height: 100%; }
-    #details-pane { height: 35%; border-bottom: solid green; padding: 1; }
-    #log-pane { height: 65%; }
-    #prompt-input { dock: bottom; display: none; margin: 1; }
+    #left-pane { width: 6fr; height: 100%; border-right: solid green; }
+    #right-pane { width: 4fr; height: 100%; }
+    #details-pane { height: 1fr; min-height: 5; border-bottom: solid green; padding: 1; }
+    #log-pane { height: 2fr; min-height: 10; }
+    #prompt-input { dock: bottom; display: none; height: 30%; min-height: 5; margin: 1; border: solid cyan; }
     """
 
     BINDINGS = [
@@ -37,6 +37,7 @@ class DashboardApp(App):
         Binding("e", "export_log", "Export Log"),
         Binding("c", "cancel_prompt", "Cancel Prompt"),
         Binding("escape", "hide_prompt", "Hide Prompt", show=False),
+        Binding("ctrl+s", "submit_prompt", "Submit Prompt", show=False),
     ]
 
     def compose(self) -> ComposeResult:
@@ -51,7 +52,9 @@ class DashboardApp(App):
                 with Vertical(id="log-pane"):
                     yield Label("Logs (Hold Shift to select/copy text)")
                     yield RichLog(id="logs_view", wrap=True, highlight=True, markup=True)
-        yield Input(placeholder="Enter prompt to send to selected agents (Enter to submit, Esc to cancel)...", id="prompt-input")
+        ta = TextArea(id="prompt-input", text="")
+        ta.border_title = "Prompt (Ctrl+S to Submit, Esc to Cancel)"
+        yield ta
         yield Footer()
 
     def on_mount(self) -> None:
@@ -138,14 +141,23 @@ class DashboardApp(App):
         self.refresh_table()
 
     def action_prompt(self) -> None:
-        inp = self.query_one("#prompt-input", Input)
+        inp = self.query_one("#prompt-input", TextArea)
+        targets = list(self.selected_agents) if self.selected_agents else ([self.current_name] if self.current_name else [])
+        if not targets:
+            inp.border_title = "Select an agent first to prompt..."
+        elif len(targets) == 1:
+            inp.border_title = f"Prompting {targets[0]}... (Ctrl+S to Submit, Esc to Cancel)"
+        else:
+            names = ", ".join(targets)
+            inp.border_title = f"MULTI-AGENT CHAT 🚀 Prompting {len(targets)} agents: {names}... (Ctrl+S to Submit)"
+            
         inp.display = True
         inp.focus()
 
     def action_hide_prompt(self) -> None:
-        inp = self.query_one("#prompt-input", Input)
+        inp = self.query_one("#prompt-input", TextArea)
         inp.display = False
-        inp.value = ""
+        inp.text = ""
         self.query_one("#agents_table").focus()
 
     def action_cancel_prompt(self) -> None:
@@ -173,8 +185,12 @@ class DashboardApp(App):
             subprocess.run(["systemctl", "--user", "stop", self.current_slug])
             self.refresh_table()
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        prompt_text = event.value.strip()
+    def action_submit_prompt(self) -> None:
+        inp = self.query_one("#prompt-input", TextArea)
+        if not inp.display:
+            return
+            
+        prompt_text = inp.text.strip()
         self.action_hide_prompt()
         if not prompt_text:
             return
@@ -186,16 +202,24 @@ class DashboardApp(App):
         for i, name in enumerate(targets):
             # Significant stagger to bypass Venice Cloudflare DDoS limits on concurrent blasts
             if i > 0:
-                await asyncio.sleep(1.5 + random.uniform(0.1, 0.5))
-            
-            self.write_log(name, "")
-            self.write_log(name, f"[bold cyan]>>> [PROMPT]: {prompt_text}[/bold cyan]")
-            
-            if name in self.prompt_tasks and not self.prompt_tasks[name].done():
-                self.prompt_tasks[name].cancel()
-            
-            slug = self.registry["agents"][name]["profile"]
-            self.prompt_tasks[name] = asyncio.create_task(self.run_prompt(name, slug, prompt_text))
+                # Fire and forget sleep so we don't block the UI thread during loop
+                asyncio.create_task(self._staggered_prompt(i, name, prompt_text))
+            else:
+                self._dispatch_prompt(name, prompt_text)
+
+    async def _staggered_prompt(self, idx: int, name: str, prompt_text: str):
+        await asyncio.sleep(1.5 * idx + random.uniform(0.1, 0.5))
+        self._dispatch_prompt(name, prompt_text)
+
+    def _dispatch_prompt(self, name: str, prompt_text: str):
+        self.write_log(name, "")
+        self.write_log(name, f"[bold cyan]>>> [PROMPT]: {prompt_text}[/bold cyan]")
+        
+        if name in self.prompt_tasks and not self.prompt_tasks[name].done():
+            self.prompt_tasks[name].cancel()
+        
+        slug = self.registry["agents"][name]["profile"]
+        self.prompt_tasks[name] = asyncio.create_task(self.run_prompt(name, slug, prompt_text))
 
     async def run_prompt(self, name: str, slug: str, prompt: str):
         try:
