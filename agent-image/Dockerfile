@@ -9,6 +9,8 @@ RUN apt-get update && apt-get install -y \
     python3-pip \
     git \
     podman \
+    nodejs \
+    npm \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Hermes Agent
